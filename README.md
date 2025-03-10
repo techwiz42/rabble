@@ -1,27 +1,16 @@
-![Rabble Logo](assets/logo.png)
+# Rabble - Offshoot of OpenAI's Swarm Framework
 
-# Rabble (experimental, educational)
-
-An educational framework exploring ergonomic, lightweight multi-agent orchestration.
+An educational framework exploring ergonomic, lightweight multi-agent orchestration running against different manufacturer's models.
 
 > [!WARNING]
-> Rabble is currently an experimental sample framework intended to explore ergonomic interfaces for multi-agent systems. It is not intended to be used in production, and therefore has no official support. (This also means we will not be reviewing PRs or issues!)
+> Swarm is currently an experimental sample framework intended to explore ergonomic interfaces for multi-agent systems. It is the author's intention to develop it to the point that it is stable and safe to use in production systems. Rabble is built on swarm - and everbody knows what they say about building on sand...
 >
-> The primary goal of Rabble is to showcase the handoff & routines patterns explored in the [Orchestrating Agents: Handoffs & Routines](https://cookbook.openai.com/examples/orchestrating_agents) cookbook. It is not meant as a standalone library, and is primarily for educational purposes.
+> The primary goal of Rabble is to provide a wrapper around OpenAI's Swarm Framework that will allow users to use models from other manufacturers (is "manufacturer" the right word for companies like Anthropic and DeepSeek?) Swarm was created to showcase the handoff & routines patterns explored in the [Orchestrating Agents: Handoffs & Routines](https://cookbook.openai.com/examples/orchestrating_agents) cookbook. It was not meant as a standalone library, and was primarily intended for educational purposes. However, it's just so damn handy the author couldn't resist taking a stab at opening it up to other models.
 
 ## Install
 
 Requires Python 3.10+
 
-```shell
-pip install git+ssh://git@github.com/openai/rabble.git
-```
-
-or
-
-```shell
-pip install git+https://github.com/openai/rabble.git
-```
 
 ## Usage
 
@@ -99,13 +88,9 @@ Check out `/examples` for inspiration! Learn more about each one in its README.
 - [`support_bot`](examples/support_bot): A customer service bot which includes a user interface agent and a help center agent with several tools
 - [`personal_shopper`](examples/personal_shopper): A personal shopping agent that can help with making sales and refunding orders
 
-# Documentation
-
-![Rabble Diagram](assets/rabble_diagram.png)
-
 ## Running Rabble
 
-Start by instantiating a Rabble client (which internally just instantiates an `OpenAI` client).
+Start by instantiating a Rabble client (which internally just instantiates an LLM client. If you're using an OpenAI model, this would be an `OpenAI` client).
 
 ```python
 from rabble import Rabble
@@ -349,7 +334,7 @@ from rabble.repl import run_demo_loop
 run_demo_loop(agent, stream=True)
 ```
 
-# Core Contributors to OpenAI's Swarm Framework
+# We are deeply grateful to the Core Contributors to OpenAI's Swarm Framework
 
 - Ilan Bigio - [ibigio](https://github.com/ibigio)
 - James Hills - [jhills20](https://github.com/jhills20)
