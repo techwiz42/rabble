@@ -1,43 +1,55 @@
+# rabble/core.py
 # Standard library imports
 import copy
 import json
 from collections import defaultdict
-from typing import List, Callable, Union
-
-# Package/library imports
-from openai import OpenAI
-
+from typing import List, Callable, Union, Dict, Any, Optional
 
 # Local imports
 from .util import function_to_json, debug_print, merge_chunk
 from .types import (
     Agent,
     AgentFunction,
-    ChatCompletionMessage,
     ChatCompletionMessageToolCall,
     Function,
     Response,
     Result,
 )
+from .adapters.base import ModelAdapter
+from .adapters.factory import ModelAdapterFactory
 
 __CTX_VARS_NAME__ = "context_variables"
 
 
 class Rabble:
-    def __init__(self, client=None):
-        if not client:
-            client = OpenAI()
-        self.client = client
+    def __init__(self, client=None, provider="openai", model=None):
+        """
+        Initialize a Rabble client.
+        
+        Args:
+            client: Optional client instance for the provider
+            provider: The LLM provider (openai, anthropic, deepseek)
+            model: Default model to use
+        """
+        if isinstance(client, ModelAdapter):
+            self.adapter = client
+        else:
+            self.adapter = ModelAdapterFactory.create_adapter(
+                provider=provider,
+                client=client,
+                model=model
+            )
 
     def get_chat_completion(
         self,
         agent: Agent,
-        history: List,
+        history: List[Dict[str, Any]],
         context_variables: dict,
         model_override: str,
         stream: bool,
         debug: bool,
-    ) -> ChatCompletionMessage:
+    ):
+        """Get a chat completion using the configured adapter."""
         context_variables = defaultdict(str, context_variables)
         instructions = (
             agent.instructions(context_variables)
@@ -55,18 +67,23 @@ class Rabble:
             if __CTX_VARS_NAME__ in params["required"]:
                 params["required"].remove(__CTX_VARS_NAME__)
 
-        create_params = {
-            "model": model_override or agent.model,
-            "messages": messages,
-            "tools": tools or None,
-            "tool_choice": agent.tool_choice,
-            "stream": stream,
-        }
+        # Create an adapter for this agent if needed, or use the default one
+        adapter = self.adapter
+        if agent.provider != "openai":  # If agent uses a different provider than the default
+            adapter = ModelAdapterFactory.create_adapter(
+                provider=agent.provider,
+                model=model_override or agent.model
+            )
 
-        if tools:
-            create_params["parallel_tool_calls"] = agent.parallel_tool_calls
-
-        return self.client.chat.completions.create(**create_params)
+        # Call the adapter's chat completion method
+        return adapter.chat_completion(
+            messages=messages,
+            tools=tools or None,
+            tool_choice=agent.tool_choice,
+            stream=stream,
+            model=model_override or agent.model,
+            parallel_tool_calls=agent.parallel_tool_calls,
+        )
 
     def handle_function_result(self, result, debug) -> Result:
         match result:
@@ -88,7 +105,7 @@ class Rabble:
 
     def handle_tool_calls(
         self,
-        tool_calls: List[ChatCompletionMessageToolCall],
+        tool_calls: List[Dict[str, Any]],
         functions: List[AgentFunction],
         context_variables: dict,
         debug: bool,
@@ -98,20 +115,20 @@ class Rabble:
             messages=[], agent=None, context_variables={})
 
         for tool_call in tool_calls:
-            name = tool_call.function.name
+            name = tool_call["function"]["name"]
             # handle missing tool case, skip to next tool
             if name not in function_map:
                 debug_print(debug, f"Tool {name} not found in function map.")
                 partial_response.messages.append(
                     {
                         "role": "tool",
-                        "tool_call_id": tool_call.id,
+                        "tool_call_id": tool_call["id"],
                         "tool_name": name,
                         "content": f"Error: Tool {name} not found.",
                     }
                 )
                 continue
-            args = json.loads(tool_call.function.arguments)
+            args = json.loads(tool_call["function"]["arguments"])
             debug_print(
                 debug, f"Processing tool call: {name} with arguments {args}")
 
@@ -125,7 +142,7 @@ class Rabble:
             partial_response.messages.append(
                 {
                     "role": "tool",
-                    "tool_call_id": tool_call.id,
+                    "tool_call_id": tool_call["id"],
                     "tool_name": name,
                     "content": result.value,
                 }
@@ -177,10 +194,18 @@ class Rabble:
                 debug=debug,
             )
 
+            # Create or get appropriate adapter for this agent
+            adapter = self.adapter
+            if active_agent.provider != "openai":
+                adapter = ModelAdapterFactory.create_adapter(
+                    provider=active_agent.provider,
+                    model=model_override or active_agent.model
+                )
+
             yield {"delim": "start"}
             for chunk in completion:
-                delta = json.loads(chunk.choices[0].delta.json())
-                if delta["role"] == "assistant":
+                delta = adapter.extract_stream_chunk(chunk)
+                if "role" in delta and delta["role"] == "assistant":
                     delta["sender"] = active_agent.name
                 yield delta
                 delta.pop("role", None)
@@ -199,21 +224,9 @@ class Rabble:
                 debug_print(debug, "Ending turn.")
                 break
 
-            # convert tool_calls to objects
-            tool_calls = []
-            for tool_call in message["tool_calls"]:
-                function = Function(
-                    arguments=tool_call["function"]["arguments"],
-                    name=tool_call["function"]["name"],
-                )
-                tool_call_object = ChatCompletionMessageToolCall(
-                    id=tool_call["id"], function=function, type=tool_call["type"]
-                )
-                tool_calls.append(tool_call_object)
-
             # handle function calls, updating context_variables, and switching agents
             partial_response = self.handle_tool_calls(
-                tool_calls, active_agent.functions, context_variables, debug
+                message["tool_calls"], active_agent.functions, context_variables, debug
             )
             history.extend(partial_response.messages)
             context_variables.update(partial_response.context_variables)
@@ -255,6 +268,13 @@ class Rabble:
         init_len = len(messages)
 
         while len(history) - init_len < max_turns and active_agent:
+            # Create or get appropriate adapter for this agent
+            adapter = self.adapter
+            if active_agent.provider != "openai":
+                adapter = ModelAdapterFactory.create_adapter(
+                    provider=active_agent.provider,
+                    model=model_override or active_agent.model
+                )
 
             # get completion with current history, agent
             completion = self.get_chat_completion(
@@ -265,20 +285,22 @@ class Rabble:
                 stream=stream,
                 debug=debug,
             )
-            message = completion.choices[0].message
+            
+            # Extract response using the adapter
+            message = adapter.extract_response(completion)
+            message["sender"] = active_agent.name
             debug_print(debug, "Received completion:", message)
-            message.sender = active_agent.name
-            history.append(
-                json.loads(message.model_dump_json())
-            )  # to avoid OpenAI types (?)
+            
+            history.append(message)
 
-            if not message.tool_calls or not execute_tools:
+            tool_calls = message.get("tool_calls", [])
+            if not tool_calls or not execute_tools:
                 debug_print(debug, "Ending turn.")
                 break
 
             # handle function calls, updating context_variables, and switching agents
             partial_response = self.handle_tool_calls(
-                message.tool_calls, active_agent.functions, context_variables, debug
+                tool_calls, active_agent.functions, context_variables, debug
             )
             history.extend(partial_response.messages)
             context_variables.update(partial_response.context_variables)
