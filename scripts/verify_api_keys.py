@@ -26,10 +26,20 @@ def verify_key(provider, model=None):
         model = os.getenv(f"{provider.upper()}_DEFAULT_MODEL")
     
     try:
+        # Create client for DeepSeek manually if needed
+        client = None
+        if provider == "deepseek":
+            try:
+                from deepseek import DeepSeekAPI
+                client = DeepSeekAPI()
+            except ImportError:
+                return False, "DeepSeek SDK not installed. Run 'pip install deepseek'."
+        
         # Create the adapter
         adapter = ModelAdapterFactory.create_adapter(
             provider=provider,
-            model=model
+            model=model,
+            client=client
         )
         
         # Simple test message
@@ -48,6 +58,8 @@ def verify_key(provider, model=None):
             return False, "No content in response"
         
         return True, response.get("content")
+    except ImportError as e:
+        return False, f"Required package not installed: {str(e)}"
     except Exception as e:
         return False, str(e)
 

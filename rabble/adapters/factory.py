@@ -1,20 +1,18 @@
 # rabble/adapters/factory.py
 from typing import Optional, Dict, Any
+import os
 
 from .base import ModelAdapter
 from .openai_adapter import OpenAIAdapter
 from .anthropic_adapter import AnthropicAdapter
 from .deepseek_adapter import DeepSeekAdapter
+from .mistral_adapter import MistralAdapter
+from .cohere_adapter import CohereAdapter
+from .google_adapter import GoogleAdapter
+from .together_adapter import TogetherAdapter
 
 class ModelAdapterFactory:
     """Factory class for creating model adapters."""
-    
-    # Default models for each provider
-    DEFAULT_MODELS = {
-        "openai": "gpt-4o",
-        "anthropic": "claude-3-5-sonnet-20240620",
-        "deepseek": "deepseek-chat"
-    }
     
     @staticmethod
     def create_adapter(
@@ -27,22 +25,30 @@ class ModelAdapterFactory:
         Create and return an adapter for the specified provider.
         
         Args:
-            provider: Provider name (openai, anthropic, deepseek)
+            provider: Provider name (openai, anthropic, deepseek, mistral, cohere, google, together)
             client: Optional client instance
             model: Optional model override
             **kwargs: Additional provider-specific initialization parameters
             
         Returns:
             A ModelAdapter instance
+            
+        Raises:
+            ValueError: If the provider is not supported or required environment variables are missing
         """
         provider = provider.lower()
         
-        if provider not in ModelAdapterFactory.DEFAULT_MODELS:
+        # Check if provider is supported
+        if provider not in ["openai", "anthropic", "deepseek", "mistral", "cohere", "google", "together"]:
             raise ValueError(f"Unsupported provider: {provider}")
         
-        # Use default model if none specified
+        # Use provided model or get from environment
         if not model:
-            model = ModelAdapterFactory.DEFAULT_MODELS[provider]
+            env_var_name = f"{provider.upper()}_DEFAULT_MODEL"
+            env_model = os.getenv(env_var_name)
+            if not env_model:
+                raise ValueError(f"No model specified and {env_var_name} environment variable not found in .env file")
+            model = env_model
         
         # Create appropriate adapter
         if provider == "openai":
@@ -51,3 +57,11 @@ class ModelAdapterFactory:
             return AnthropicAdapter(client=client, default_model=model, **kwargs)
         elif provider == "deepseek":
             return DeepSeekAdapter(client=client, default_model=model, **kwargs)
+        elif provider == "mistral":
+            return MistralAdapter(client=client, default_model=model, **kwargs)
+        elif provider == "cohere":
+            return CohereAdapter(client=client, default_model=model, **kwargs)
+        elif provider == "google":
+            return GoogleAdapter(client=client, default_model=model, **kwargs)
+        elif provider == "together":
+            return TogetherAdapter(client=client, default_model=model, **kwargs)

@@ -1,7 +1,17 @@
 # rabble/__init__.py
 from .core import Rabble
 from .types import Agent, Response, Result
-from .adapters import ModelAdapter, ModelAdapterFactory, OpenAIAdapter, AnthropicAdapter, DeepSeekAdapter
+from .adapters import (
+    ModelAdapter, 
+    ModelAdapterFactory, 
+    OpenAIAdapter, 
+    AnthropicAdapter, 
+    DeepSeekAdapter,
+    MistralAdapter,
+    CohereAdapter,
+    GoogleAdapter,
+    TogetherAdapter
+)
 
 __all__ = [
     "Rabble", 
@@ -12,5 +22,9 @@ __all__ = [
     "ModelAdapterFactory",
     "OpenAIAdapter",
     "AnthropicAdapter",
-    "DeepSeekAdapter"
+    "DeepSeekAdapter",
+    "MistralAdapter",
+    "CohereAdapter",
+    "GoogleAdapter",
+    "TogetherAdapter"
 ]

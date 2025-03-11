@@ -3,6 +3,10 @@ from .base import ModelAdapter
 from .openai_adapter import OpenAIAdapter
 from .anthropic_adapter import AnthropicAdapter
 from .deepseek_adapter import DeepSeekAdapter
+from .mistral_adapter import MistralAdapter
+from .google_adapter import GoogleAdapter
+from .cohere_adapter import CohereAdapter
+from .together_adapter import TogetherAdapter
 from .factory import ModelAdapterFactory
 
 __all__ = [
@@ -10,5 +14,9 @@ __all__ = [
     "OpenAIAdapter", 
     "AnthropicAdapter", 
     "DeepSeekAdapter",
+    "MistralAdapter",
+    "GoogleAdapter",
+    "TogetherAdapter",
+    "CohereAdapter",
     "ModelAdapterFactory"
 ]
