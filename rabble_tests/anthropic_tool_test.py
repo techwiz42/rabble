@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-Anthropic Custom Tool Test
+Anthropic Tool Test
 
-This script tests the Anthropic API with tools based on our API exploration.
+This script tests the Anthropic API with tools based on the current Claude tool format.
 """
 
 import os
@@ -30,45 +30,42 @@ if not model:
 
 print(f"Using model: {model}")
 
-# Test with the correct tool format based on API exploration
+# Test with the correct tool format based on Anthropic's documentation
 try:
-    print("\n=== Testing Anthropic Custom Tool Format ===\n")
+    print("\n=== Testing Anthropic Tool Format ===\n")
     from anthropic import Anthropic
     
     client = Anthropic(api_key=api_key)
     
-    # Define the tool with the format we learned from API exploration
-    custom_tool = {
-        "type": "custom",
-        "custom": {
-            "name": "get_weather",
-            "description": "Get the weather for a location",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "The city and state, e.g. San Francisco, CA"
-                    },
-                    "unit": {
-                        "type": "string",
-                        "enum": ["celsius", "fahrenheit"],
-                        "description": "The unit of temperature"
-                    }
+    # Define the tool with the correct format for current Claude API
+    weather_tool = {
+        "name": "get_weather",
+        "description": "Get the weather for a location. Returns current temperature, conditions, and other weather information.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The city and state, e.g. San Francisco, CA"
                 },
-                "required": ["location"]
-            }
+                "unit": {
+                    "type": "string",
+                    "enum": ["celsius", "fahrenheit"],
+                    "description": "The unit of temperature"
+                }
+            },
+            "required": ["location"]
         }
     }
     
-    print("Sending request with custom tool...")
+    print("Sending request with tool...")
     response = client.messages.create(
         model=model,
         max_tokens=300,
         messages=[
             {"role": "user", "content": "What's the weather like in San Francisco?"}
         ],
-        tools=[custom_tool]
+        tools=[weather_tool]
     )
     
     print("\nResponse content:")
@@ -82,8 +79,8 @@ try:
                 tool_use_found = True
                 print(f"\nTool use detected:")
                 print(f"  Tool ID: {block.id}")
-                print(f"  Tool name: {block.tool_use.name}")
-                print(f"  Tool input: {json.dumps(block.tool_use.input, indent=2)}")
+                print(f"  Tool name: {block.name}")
+                print(f"  Tool input: {json.dumps(block.input, indent=2)}")
     
     # If a tool was used, now let's respond to it
     if tool_use_found:
@@ -94,26 +91,29 @@ try:
         
         if tool_use_block:
             tool_id = tool_use_block.id
-            tool_name = tool_use_block.tool_use.name
-            tool_input = tool_use_block.tool_use.input
             
             # Create a fake weather result
             weather_result = {
                 "temperature": 72,
                 "condition": "sunny",
                 "precipitation": 0,
-                "location": tool_input.get("location", "San Francisco"),
-                "unit": tool_input.get("unit", "fahrenheit")
+                "location": tool_use_block.input.get("location", "San Francisco"),
+                "unit": tool_use_block.input.get("unit", "fahrenheit")
             }
             
-            # Create message chain with tool result
+            # Create message chain with tool result in Anthropic's format
             messages = [
                 {"role": "user", "content": "What's the weather like in San Francisco?"},
                 {"role": "assistant", "content": [
-                    {"type": "tool_use", "id": tool_id, "tool_use": {"name": tool_name, "input": tool_input}}
+                    {"type": "tool_use", 
+                     "id": tool_id, 
+                     "name": tool_use_block.name, 
+                     "input": tool_use_block.input}
                 ]},
                 {"role": "user", "content": [
-                    {"type": "tool_result", "tool_call_id": tool_id, "content": json.dumps(weather_result)}
+                    {"type": "tool_result", 
+                     "tool_call_id": tool_id, 
+                     "content": json.dumps(weather_result)}
                 ]}
             ]
             
@@ -122,7 +122,7 @@ try:
                 model=model,
                 max_tokens=300,
                 messages=messages,
-                tools=[custom_tool]  # Include the same tools again
+                tools=[weather_tool]  # Include the same tools again
             )
             
             print("\nFinal response content:")
@@ -135,11 +135,11 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
-# Now let's test with our updated adapter
+# Now let's test with our updated Rabble adapter
 try:
     print("\n=== Testing with Updated Rabble Adapter ===\n")
     
-    # Import after modifying function_to_json to support Anthropic
+    # Import the necessary components
     from rabble import Rabble, Agent
     from rabble.types import Result
     
@@ -183,7 +183,7 @@ try:
     response = client.run(
         agent=agent,
         messages=[{"role": "user", "content": "What's the weather like in Chicago?"}],
-        max_tokens=300  # Include max_tokens for Anthropic
+        max_tokens=300
     )
     
     print("\nRabble response:")

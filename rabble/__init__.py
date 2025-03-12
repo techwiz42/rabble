@@ -9,8 +9,7 @@ from .adapters import (
     DeepSeekAdapter,
     MistralAdapter,
     CohereAdapter,
-    GoogleAdapter,
-    TogetherAdapter
+    GoogleAdapter
 )
 
 __all__ = [
@@ -25,6 +24,5 @@ __all__ = [
     "DeepSeekAdapter",
     "MistralAdapter",
     "CohereAdapter",
-    "GoogleAdapter",
-    "TogetherAdapter"
+    "GoogleAdapter"
 ]

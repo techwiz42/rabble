@@ -38,10 +38,22 @@ class CohereAdapter(ModelAdapter):
         for msg in messages:
             if msg["role"] == "system":
                 system_message = msg["content"]
-            elif msg["role"] == "user" or msg["role"] == "assistant":
+            elif msg["role"] == "user":
                 chat_history.append({
-                    "role": msg["role"],
+                    "role": "User",  # Cohere uses capitalized role names
                     "message": msg["content"]
+                })
+            elif msg["role"] == "assistant":
+                chat_history.append({
+                    "role": "Chatbot",  # Cohere uses "Chatbot" instead of "assistant"
+                    "message": msg["content"]
+                })
+            elif msg["role"] == "tool":
+                # Cohere uses a "Tool" role for tool responses
+                chat_history.append({
+                    "role": "Tool",
+                    "message": msg["content"],
+                    "name": msg.get("tool_name", "unknown_tool")
                 })
         
         create_params = {

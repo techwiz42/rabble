@@ -46,13 +46,8 @@ class GoogleAdapter(ModelAdapter):
         # Start a chat session
         chat = model_instance.start_chat()
         
-        # System message handling
+        # System message handling - Add to first message instead of using generation_config
         system_message = next((msg["content"] for msg in messages if msg["role"] == "system"), None)
-        if system_message:
-            generation_config = genai.GenerationConfig(
-                system_instructions=system_message
-            )
-            model_instance.generation_config = generation_config
         
         # Process functions if available
         if tools:
@@ -62,8 +57,20 @@ class GoogleAdapter(ModelAdapter):
         # Handle conversation history
         user_messages = [msg for msg in messages if msg["role"] != "system"]
         
+        # If there's a system message, prepend it to the first user message
+        if system_message and user_messages:
+            first_msg = user_messages[0]
+            if first_msg["role"] == "user":
+                # Create a system prompt prefix
+                system_prefix = f"System Instructions: {system_message}\n\nUser Query: "
+                user_messages[0]["content"] = system_prefix + first_msg["content"]
+        
         # Send all messages in sequence
         for i, msg in enumerate(user_messages):
+            # Skip empty messages
+            if not msg.get("content"):
+                continue
+                
             if i == len(user_messages) - 1 and stream:
                 # For the last message with streaming
                 return chat.send_message(msg["content"], stream=True)

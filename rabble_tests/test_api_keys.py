@@ -238,42 +238,6 @@ def test_google_key():
         print(f"Google test failed: {str(e)}")
         return False
 
-def test_together_key():
-    """Test if the Together AI API key is valid."""
-    api_key = os.getenv("TOGETHER_API_KEY")
-    assert api_key, "TOGETHER_API_KEY not found in environment variables"
-    
-    # Get model from environment
-    model = os.getenv("TOGETHER_DEFAULT_MODEL")
-    assert model, "TOGETHER_DEFAULT_MODEL not found in environment variables"
-    
-    try:
-        # Create the adapter with direct API key
-        adapter = TogetherAdapter(api_key=api_key, default_model=model)
-        
-        # Simple test message
-        messages = [{"role": "user", "content": "Hello, this is a test message."}]
-        
-        # Make a minimal request - REST API approach
-        try:
-            completion = adapter.chat_completion(
-                messages=messages,
-                model=model,
-                max_tokens=10  # Minimal response to save tokens
-            )
-            
-            # Extract response to verify we got something back
-            response = adapter.extract_response(completion)
-            assert response.get("content"), "No content in response"
-            print(f"Together test passed ({model}): {response.get('content')}")
-            return True
-        except Exception as inner_e:
-            print(f"Together REST API approach failed: {str(inner_e)}")
-            raise
-    except Exception as e:
-        print(f"Together test failed: {str(e)}")
-        return False
-
 if __name__ == "__main__":
     print("Testing API keys...")
     test_results = {
@@ -283,7 +247,6 @@ if __name__ == "__main__":
         "Mistral": test_mistral_key(),
         "Cohere": test_cohere_key(),
         "Google": test_google_key(),
-        "Together": test_together_key()
     }
     
     print("\nSummary:")

@@ -76,34 +76,42 @@ class Rabble:
                 model=model_override or agent.model
             )
 
-        # Call the adapter's chat completion method
-        return adapter.chat_completion(
-            messages=messages,
-            tools=tools or None,
-            tool_choice=agent.tool_choice,
-            stream=stream,
-            model=model_override or agent.model,
-            parallel_tool_calls=agent.parallel_tool_calls,
-            **kwargs  # Pass additional parameters to the adapter
-        )
+        # Create parameters for the adapter call
+        adapter_params = {
+            "messages": messages,
+            "tools": tools or None,
+            "tool_choice": agent.tool_choice,
+            "stream": stream,
+            "model": model_override or agent.model,
+        }
+        
+        # Only include parallel_tool_calls if there are tools and it's explicitly enabled
+        if tools and agent.parallel_tool_calls:
+            adapter_params["parallel_tool_calls"] = agent.parallel_tool_calls
+        
+        # Add any additional parameters
+        adapter_params.update(kwargs)
+        
+        # Call the adapter's chat completion method with the proper parameters
+        return adapter.chat_completion(**adapter_params)
 
-        def handle_function_result(self, result, debug) -> Result:
-            match result:
-                case Result() as result:
-                    return result
+    def handle_function_result(self, result, debug) -> Result:
+        match result:
+            case Result() as result:
+                return result
 
-                case Agent() as agent:
-                    return Result(
-                        value=json.dumps({"assistant": agent.name}),
-                        agent=agent,
-                    )
-                case _:
-                    try:
-                        return Result(value=str(result))
-                    except Exception as e:
-                        error_message = f"Failed to cast response to string: {result}. Make sure agent functions return a string or Result object. Error: {str(e)}"
-                        debug_print(debug, error_message)
-                        raise TypeError(error_message)
+            case Agent() as agent:
+                return Result(
+                    value=json.dumps({"assistant": agent.name}),
+                    agent=agent,
+                )
+            case _:
+                try:
+                    return Result(value=str(result))
+                except Exception as e:
+                    error_message = f"Failed to cast response to string: {result}. Make sure agent functions return a string or Result object. Error: {str(e)}"
+                    debug_print(debug, error_message)
+                    raise TypeError(error_message)
 
     def handle_tool_calls(
         self,
@@ -164,6 +172,7 @@ class Rabble:
         debug: bool = False,
         max_turns: int = float("inf"),
         execute_tools: bool = True,
+        **kwargs
     ):
         active_agent = agent
         context_variables = copy.deepcopy(context_variables)
@@ -194,6 +203,7 @@ class Rabble:
                 model_override=model_override,
                 stream=True,
                 debug=debug,
+                **kwargs
             )
 
             # Create or get appropriate adapter for this agent
@@ -242,8 +252,6 @@ class Rabble:
                 context_variables=context_variables,
             )
         }
-
-    # rabble/core.py - run method modification
 
     def run(
         self,

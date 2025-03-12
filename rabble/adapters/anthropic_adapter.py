@@ -45,17 +45,70 @@ class AnthropicAdapter(ModelAdapter):
         system_message = next((m["content"] for m in messages if m["role"] == "system"), None)
         
         # Filter out system messages as they're handled separately in Anthropic's API
-        anthropic_messages = [
-            {
-                "role": "assistant" if m["role"] == "assistant" else "user",
-                "content": m["content"]
-            }
-            for m in messages if m["role"] != "system"
-        ]
+        user_and_assistant_messages = []
+        for i, message in enumerate(messages):
+            if message["role"] == "system":
+                continue
+                
+            if message["role"] == "tool":
+                # Find the preceding assistant message that used this tool
+                tool_call_id = message.get("tool_call_id")
+                for j in range(i-1, -1, -1):
+                    prev_msg = messages[j]
+                    if prev_msg.get("role") == "assistant" and prev_msg.get("tool_calls"):
+                        # Found the assistant message that called this tool
+                        matching_tool_call = next(
+                            (tc for tc in prev_msg.get("tool_calls", []) 
+                             if tc.get("id") == tool_call_id),
+                            None
+                        )
+                        if matching_tool_call:
+                            # Convert to Anthropic's tool_result format
+                            user_and_assistant_messages.append({
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "tool_result",
+                                        "tool_call_id": tool_call_id,
+                                        "content": message.get("content", "")
+                                    }
+                                ]
+                            })
+                        break
+            else:
+                # Regular user or assistant message
+                if message["role"] == "assistant" and message.get("tool_calls"):
+                    # Convert assistant message with tool_calls to Anthropic format
+                    content_blocks = []
+                    
+                    # Add text content if present
+                    if message.get("content"):
+                        content_blocks.append({"type": "text", "text": message["content"]})
+                    
+                    # Add tool_use blocks
+                    for tool_call in message.get("tool_calls", []):
+                        content_blocks.append({
+                            "type": "tool_use",
+                            "id": tool_call.get("id", ""),
+                            "name": tool_call.get("function", {}).get("name", ""),
+                            "input": json.loads(tool_call.get("function", {}).get("arguments", "{}"))
+                        })
+                    
+                    user_and_assistant_messages.append({
+                        "role": "assistant",
+                        "content": content_blocks
+                    })
+                else:
+                    # Regular message without tool calls
+                    user_and_assistant_messages.append({
+                        "role": message["role"],
+                        "content": message["content"]
+                    })
         
+        # Prepare API request parameters
         create_params = {
             "model": model or self.default_model,
-            "messages": anthropic_messages,
+            "messages": user_and_assistant_messages,
             "stream": stream,
             "max_tokens": kwargs.pop("max_tokens", 1000),  # Default to 1000 tokens if not specified
         }
@@ -64,7 +117,32 @@ class AnthropicAdapter(ModelAdapter):
             create_params["system"] = system_message
         
         if tools:
-            create_params["tools"] = tools  # Tools are already formatted correctly
+            # Convert tools to Anthropic's format
+            anthropic_tools = []
+            for tool in tools:
+                if tool.get("type") == "function":
+                    function_def = tool.get("function", {})
+                    anthropic_tools.append({
+                        "name": function_def.get("name", ""),
+                        "description": function_def.get("description", ""),
+                        "input_schema": function_def.get("parameters", {})
+                    })
+            create_params["tools"] = anthropic_tools
+            
+            # Handle tool_choice if specified
+            if tool_choice:
+                if tool_choice == "none":
+                    create_params["tool_choice"] = {"type": "none"}
+                elif tool_choice == "auto":
+                    create_params["tool_choice"] = {"type": "auto"}
+                elif tool_choice == "any":
+                    create_params["tool_choice"] = {"type": "any"}
+                else:
+                    # Specific tool choice
+                    create_params["tool_choice"] = {
+                        "type": "tool",
+                        "name": tool_choice
+                    }
         
         # Remove parameters not supported by Anthropic
         kwargs.pop("parallel_tool_calls", None)
@@ -77,18 +155,22 @@ class AnthropicAdapter(ModelAdapter):
         return self.client.messages.create(**create_params)
     
     def format_tools(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Convert standard tool format to Anthropic tool format.
+        """Convert standard tool format to Anthropic tool format."""
+        anthropic_tools = []
         
-        Note: With the updated function_to_json utility, tools should already
-        be in the correct format for Anthropic.
-        """
-        # Tools should already be in the correct format from function_to_json
-        return tools
+        for tool in tools:
+            if tool.get("type") == "function":
+                function_def = tool.get("function", {})
+                anthropic_tools.append({
+                    "name": function_def.get("name", ""),
+                    "description": function_def.get("description", ""),
+                    "input_schema": function_def.get("parameters", {})
+                })
+        
+        return anthropic_tools
     
     def extract_response(self, completion: Any) -> Dict[str, Any]:
         """Extract response from Anthropic completion object."""
-        # From API exploration, completion.content is a list of blocks
         content = ""
         tool_calls = []
         
@@ -100,18 +182,18 @@ class AnthropicAdapter(ModelAdapter):
                 elif block.type == 'tool_use':
                     # Found a tool call
                     tool_calls.append({
-                        "id": getattr(block, 'id', f"call_{len(tool_calls)}"),
+                        "id": block.id,
                         "type": "function",
                         "function": {
-                            "name": block.tool_use.name,
-                            "arguments": json.dumps(block.tool_use.input)
+                            "name": block.name,
+                            "arguments": json.dumps(block.input)
                         }
                     })
         
         return {
             "role": "assistant",
             "content": content,
-            "tool_calls": tool_calls
+            "tool_calls": tool_calls if tool_calls else None
         }
     
     def extract_stream_chunk(self, chunk: Any) -> Dict[str, Any]:
@@ -119,23 +201,43 @@ class AnthropicAdapter(ModelAdapter):
         result = {}
         
         # Handle different types of stream events from Anthropic
-        if hasattr(chunk, 'delta') and hasattr(chunk.delta, 'text'):
-            return {"content": chunk.delta.text}
-        elif hasattr(chunk, 'delta') and hasattr(chunk.delta, 'tool_use'):
-            # Handle tool_use delta
-            return {
-                "tool_calls": [
-                    {
-                        "index": 0,  # Anthropic typically returns one tool at a time
-                        "function": {
-                            "name": chunk.delta.tool_use.name,
-                            "arguments": json.dumps(chunk.delta.tool_use.input)
+        if hasattr(chunk, 'type'):
+            if chunk.type == 'content_block_delta':
+                if hasattr(chunk, 'delta') and hasattr(chunk.delta, 'type'):
+                    if chunk.delta.type == 'text_delta':
+                        return {"content": chunk.delta.text}
+                    elif chunk.delta.type == 'tool_use_delta':
+                        # Handle tool_use delta
+                        tool_call = {
+                            "index": 0,  # Anthropic typically returns one tool at a time
+                            "function": {}
                         }
-                    }
-                ]
-            }
-        else:
-            return {}
+                        
+                        if hasattr(chunk.delta, 'name'):
+                            tool_call["function"]["name"] = chunk.delta.name
+                        if hasattr(chunk.delta, 'input'):
+                            tool_call["function"]["arguments"] = json.dumps(chunk.delta.input)
+                        
+                        return {"tool_calls": [tool_call]}
+            
+            # For initial content block
+            elif chunk.type == 'content_block_start':
+                if hasattr(chunk, 'content_block') and hasattr(chunk.content_block, 'type'):
+                    if chunk.content_block.type == 'tool_use':
+                        # Initial tool use block
+                        return {
+                            "tool_calls": [
+                                {
+                                    "index": 0,
+                                    "function": {
+                                        "name": chunk.content_block.name,
+                                        "arguments": json.dumps(chunk.content_block.input)
+                                    }
+                                }
+                            ]
+                        }
+        
+        return result
     
     def extract_tool_calls(self, completion: Any) -> List[Dict[str, Any]]:
         """Extract tool calls from Anthropic completion."""
@@ -146,11 +248,11 @@ class AnthropicAdapter(ModelAdapter):
             for block in completion.content:
                 if hasattr(block, 'type') and block.type == 'tool_use':
                     tool_calls.append({
-                        "id": getattr(block, 'id', f"call_{len(tool_calls)}"),
+                        "id": block.id,
                         "type": "function",
                         "function": {
-                            "name": block.tool_use.name,
-                            "arguments": json.dumps(block.tool_use.input)
+                            "name": block.name,
+                            "arguments": json.dumps(block.input)
                         }
                     })
         

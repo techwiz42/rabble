@@ -33,16 +33,32 @@ class MistralAdapter(ModelAdapter):
             default_model: Default model to use
             api_key: Optional API key if client is not provided
         """
-        self.api_key = os.getenv("MISTRAL_API_KEY")
-        self.default_model = os.getenv("MISTRAL_DEFAULT_MODEL")
+        # Get API key with proper priority: passed param > environment
+        self.api_key = api_key or os.getenv("MISTRAL_API_KEY")
+        if not self.api_key:
+            raise ValueError("No API key provided for Mistral. Set MISTRAL_API_KEY environment variable.")
+            
+        # Get model with proper priority: passed param > environment
+        self.default_model = default_model or os.getenv("MISTRAL_DEFAULT_MODEL")
+        if not self.default_model:
+            raise ValueError("No model specified for Mistral. Set MISTRAL_DEFAULT_MODEL environment variable.")
         
+        # Initialize client with proper error handling and diagnostic information
         if client:
             self.client = client
         elif NEW_CLIENT:
-            self.client = Mistral(api_key=api_key)
+            try:
+                self.client = Mistral(api_key=self.api_key)
+            except Exception as e:
+                print(f"Mistral client initialization error with v1.x: {str(e)}")
+                raise
         else:
-            from mistralai.client import MistralClient
-            self.client = MistralClient(api_key=api_key)
+            try:
+                from mistralai.client import MistralClient
+                self.client = MistralClient(api_key=self.api_key)
+            except Exception as e:
+                print(f"Mistral client initialization error with v0.x: {str(e)}")
+                raise
     
     def chat_completion(
         self,
@@ -74,19 +90,24 @@ class MistralAdapter(ModelAdapter):
             if key not in create_params and key not in ["parallel_tool_calls"]:
                 create_params[key] = value
         
-        # Make the API call based on client version
-        if NEW_CLIENT:
-            # New client (v1.x)
-            if stream:
-                return self.client.chat.stream(**create_params)
+        # Make the API call based on client version with error reporting
+        try:
+            if NEW_CLIENT:
+                # New client (v1.x)
+                if stream:
+                    return self.client.chat.stream(**create_params)
+                else:
+                    return self.client.chat.complete(**create_params)
             else:
-                return self.client.chat.complete(**create_params)
-        else:
-            # Old client (v0.x)
-            if stream:
-                return self.client.chat_stream(**create_params)
-            else:
-                return self.client.chat(**create_params)
+                # Old client (v0.x)
+                if stream:
+                    return self.client.chat_stream(**create_params)
+                else:
+                    return self.client.chat(**create_params)
+        except Exception as e:
+            print(f"Mistral API call error: {str(e)}")
+            print(f"API parameters: model={create_params['model']}, messages={len(create_params['messages'])} items")
+            raise
     
     def format_tools(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Convert standard tool format to Mistral AI tool format."""

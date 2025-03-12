@@ -9,7 +9,6 @@ from .deepseek_adapter import DeepSeekAdapter
 from .mistral_adapter import MistralAdapter
 from .cohere_adapter import CohereAdapter
 from .google_adapter import GoogleAdapter
-from .together_adapter import TogetherAdapter
 
 class ModelAdapterFactory:
     """Factory class for creating model adapters."""
@@ -25,7 +24,7 @@ class ModelAdapterFactory:
         Create and return an adapter for the specified provider.
         
         Args:
-            provider: Provider name (openai, anthropic, deepseek, mistral, cohere, google, together)
+            provider: Provider name (openai, anthropic, deepseek, mistral, cohere, google)
             client: Optional client instance
             model: Optional model override
             **kwargs: Additional provider-specific initialization parameters
@@ -39,7 +38,7 @@ class ModelAdapterFactory:
         provider = provider.lower()
         
         # Check if provider is supported
-        if provider not in ["openai", "anthropic", "deepseek", "mistral", "cohere", "google", "together"]:
+        if provider not in ["openai", "anthropic", "deepseek", "mistral", "cohere", "google"]:
             raise ValueError(f"Unsupported provider: {provider}")
         
         # Use provided model or get from environment
@@ -63,5 +62,3 @@ class ModelAdapterFactory:
             return CohereAdapter(client=client, default_model=model, **kwargs)
         elif provider == "google":
             return GoogleAdapter(client=client, default_model=model, **kwargs)
-        elif provider == "together":
-            return TogetherAdapter(client=client, default_model=model, **kwargs)

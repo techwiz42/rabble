@@ -6,7 +6,6 @@ from .deepseek_adapter import DeepSeekAdapter
 from .mistral_adapter import MistralAdapter
 from .google_adapter import GoogleAdapter
 from .cohere_adapter import CohereAdapter
-from .together_adapter import TogetherAdapter
 from .factory import ModelAdapterFactory
 
 __all__ = [
@@ -16,7 +15,6 @@ __all__ = [
     "DeepSeekAdapter",
     "MistralAdapter",
     "GoogleAdapter",
-    "TogetherAdapter",
     "CohereAdapter",
     "ModelAdapterFactory"
 ]
