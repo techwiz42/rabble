@@ -14,8 +14,7 @@ from rabble.adapters import (
     DeepSeekAdapter, 
     MistralAdapter, 
     CohereAdapter, 
-    GoogleAdapter, 
-    TogetherAdapter
+    GoogleAdapter 
 )
 
 # Load environment variables from .env file
