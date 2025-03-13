@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-DeepSeek Adapter Test Harness
+Cohere Adapter Test Harness
 
-This script tests the DeepSeek adapter with both creative writing
+This script tests the Cohere adapter with both creative writing
 and mathematical calculations using tool calls.
 """
 
@@ -22,20 +22,20 @@ sys.path.append(parent_dir)
 # Import from rabble
 from rabble import Rabble, Agent
 from rabble.types import Result
-from rabble.adapters.deepseek_adapter import DeepSeekAdapter
+from rabble.adapters.cohere_adapter import CohereAdapter
 
 # Load environment variables
 env_path = Path(__file__).parent.parent / "rabble" / ".env"
 load_dotenv(env_path)
 
 # Ensure we have the required environment variables
-api_key = os.getenv("DEEPSEEK_API_KEY")
-model = os.getenv("DEEPSEEK_DEFAULT_MODEL", "deepseek-chat")
+api_key = os.getenv("COHERE_API_KEY")
+model = os.getenv("COHERE_DEFAULT_MODEL", "command-r-plus")
 
 if not api_key:
-    raise ValueError("DEEPSEEK_API_KEY not found in environment variables")
+    raise ValueError("COHERE_API_KEY not found in environment variables")
 
-print(f"Using DeepSeek model: {model}")
+print(f"Using Cohere model: {model}")
 
 # Define a calculator function that can do various operations
 def calculate(context_variables, operation: str, x: float, y: float = None) -> Result:
@@ -90,18 +90,18 @@ def calculate(context_variables, operation: str, x: float, y: float = None) -> R
         }
     )
 
-def test_deepseek_creative_writing():
-    """Test DeepSeek's creative writing capabilities without tool use."""
-    print("\n=== Testing DeepSeek Creative Writing ===\n")
+def test_cohere_creative_writing():
+    """Test Cohere's creative writing capabilities without tool use."""
+    print("\n=== Testing Cohere Creative Writing ===\n")
     
-    # Create Rabble client with DeepSeek adapter
-    adapter = DeepSeekAdapter(default_model=model)
-    client = Rabble(client=adapter, provider="deepseek", model=model)
+    # Create Rabble client with Cohere adapter
+    adapter = CohereAdapter(default_model=model)
+    client = Rabble(client=adapter, provider="cohere", model=model)
     
     # Create agent
     agent = Agent(
-        name="DeepSeek Poet",
-        provider="deepseek",
+        name="Cohere Poet",
+        provider="cohere",
         model=model,
         instructions="You are a thoughtful AI poet. When asked to write poetry, create insightful and meaningful verse."
     )
@@ -125,7 +125,7 @@ def test_deepseek_creative_writing():
         assistant_message = next((msg for msg in response.messages if msg.get("role") == "assistant"), None)
         if assistant_message and assistant_message.get("content"):
             content = assistant_message.get("content")
-            print(f"DeepSeek's poem ({elapsed_time:.2f}s):")
+            print(f"Cohere's poem ({elapsed_time:.2f}s):")
             print(f"\n{content}\n")
         else:
             print("No response received")
@@ -135,18 +135,18 @@ def test_deepseek_creative_writing():
         print(f"Error in creative writing test: {str(e)}")
         return False
 
-def test_deepseek_calculation():
-    """Test DeepSeek's calculation abilities using tool calls."""
-    print("\n=== Testing DeepSeek Tool Use with Calculations ===\n")
+def test_cohere_calculation():
+    """Test Cohere's calculation abilities using tool calls."""
+    print("\n=== Testing Cohere Tool Use with Calculations ===\n")
     
-    # Create Rabble client with DeepSeek adapter
-    adapter = DeepSeekAdapter(default_model=model)
-    client = Rabble(client=adapter, provider="deepseek", model=model)
+    # Create Rabble client with Cohere adapter
+    adapter = CohereAdapter(default_model=model)
+    client = Rabble(client=adapter, provider="cohere", model=model)
     
     # Create agent with calculator function
     agent = Agent(
-        name="DeepSeek Calculator",
-        provider="deepseek",
+        name="Cohere Calculator",
+        provider="cohere",
         model=model,
         instructions="""You are a calculator assistant with access to a calculator tool.
         
@@ -169,9 +169,7 @@ Always verify your inputs and explain your calculation approach before using the
     prompt = f"""Perform these calculations step by step:
 1. Multiply these two numbers: {num1} and {num2}
 2. Take the square root of their product
-Use the calculate tool for each step. Make sure to format your response like this:
-- For step 1: Using the calculator tool: Operation: multiply, x = {num1}, y = {num2}
-- For step 2: Using the calculator tool: Operation: sqrt, x = [result from step 1]
+
 Please show your work and the final result."""
     
     print(f"Numbers: {num1} and {num2}")
@@ -185,7 +183,7 @@ Please show your work and the final result."""
     try:
         # Make request
         start_time = time.time()
-        print("Sending request to DeepSeek...")
+        print("Sending request to Cohere...")
         response = client.run(
             agent=agent,
             messages=[{"role": "user", "content": prompt}],
@@ -230,18 +228,21 @@ Please show your work and the final result."""
         traceback.print_exc()
         return False
 
-def test_deepseek_streaming():
-    """Test DeepSeek's streaming capabilities."""
-    print("\n=== Testing DeepSeek Streaming ===\n")
+def test_cohere_streaming():
+    """Test Cohere's streaming capabilities."""
+    print("\n=== Testing Cohere Streaming ===\n")
     
-    # Create Rabble client with DeepSeek adapter
-    adapter = DeepSeekAdapter(default_model=model)
-    client = Rabble(client=adapter, provider="deepseek", model=model)
+    # Note: Cohere's API may not support streaming in the same way as other providers
+    # This test might need adjustment based on Cohere's streaming implementation
+    
+    # Create Rabble client with Cohere adapter
+    adapter = CohereAdapter(default_model=model)
+    client = Rabble(client=adapter, provider="cohere", model=model)
     
     # Create agent with calculator function
     agent = Agent(
-        name="DeepSeek Stream",
-        provider="deepseek",
+        name="Cohere Stream",
+        provider="cohere",
         model=model,
         instructions="You are a helpful assistant that provides concise responses.",
         functions=[calculate]
@@ -283,16 +284,16 @@ def test_deepseek_streaming():
         return False
 
 if __name__ == "__main__":
-    print("DeepSeek Adapter Test Harness")
-    print("============================")
+    print("Cohere Adapter Test Harness")
+    print("==========================")
     
     # Set debug environment variable
-    os.environ["DEEPSEEK_DEBUG"] = "1"
+    os.environ["COHERE_DEBUG"] = "1"
     
     # Run tests
-    creative_result = test_deepseek_creative_writing()
-    calculation_result = test_deepseek_calculation()
-    streaming_result = test_deepseek_streaming()
+    creative_result = test_cohere_creative_writing()
+    calculation_result = test_cohere_calculation()
+    streaming_result = test_cohere_streaming()
     
     # Print summary
     print("\nTest Results Summary:")

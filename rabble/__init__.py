@@ -6,7 +6,6 @@ from .adapters import (
     ModelAdapterFactory, 
     OpenAIAdapter, 
     AnthropicAdapter, 
-    DeepSeekAdapter,
     MistralAdapter,
     CohereAdapter,
     GoogleAdapter
@@ -21,7 +20,6 @@ __all__ = [
     "ModelAdapterFactory",
     "OpenAIAdapter",
     "AnthropicAdapter",
-    "DeepSeekAdapter",
     "MistralAdapter",
     "CohereAdapter",
     "GoogleAdapter"

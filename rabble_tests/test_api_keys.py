@@ -11,7 +11,6 @@ sys.path.append(str(Path(__file__).parent.parent))
 from rabble.adapters import (
     OpenAIAdapter, 
     AnthropicAdapter, 
-    DeepSeekAdapter, 
     MistralAdapter, 
     CohereAdapter, 
     GoogleAdapter 
@@ -80,42 +79,6 @@ def test_anthropic_key():
         return True
     except Exception as e:
         print(f"Anthropic test failed: {str(e)}")
-        return False
-
-def test_deepseek_key():
-    """Test if the DeepSeek API key is valid."""
-    api_key = os.getenv("DEEPSEEK_API_KEY")
-    assert api_key, "DEEPSEEK_API_KEY not found in environment variables"
-    
-    # Get model from environment
-    model = os.getenv("DEEPSEEK_DEFAULT_MODEL")
-    assert model, "DEEPSEEK_DEFAULT_MODEL not found in environment variables"
-    
-    try:
-        # Import DeepSeekAPI and set up client
-        from deepseek import DeepSeekAPI
-        client = DeepSeekAPI()
-        
-        # Create the adapter
-        adapter = DeepSeekAdapter(client=client, default_model=model)
-        
-        # Simple test message
-        messages = [{"role": "user", "content": "Hello, this is a test message."}]
-        
-        # Make a minimal request
-        completion = adapter.chat_completion(
-            messages=messages,
-            model=model,
-            max_tokens=10  # Minimal response to save tokens
-        )
-        
-        # Extract response to verify we got something back
-        response = adapter.extract_response(completion)
-        assert response.get("content"), "No content in response"
-        print(f"DeepSeek test passed ({model}): {response.get('content')}")
-        return True
-    except Exception as e:
-        print(f"DeepSeek test failed: {str(e)}")
         return False
 
 def test_mistral_key():

@@ -5,7 +5,6 @@ import os
 from .base import ModelAdapter
 from .openai_adapter import OpenAIAdapter
 from .anthropic_adapter import AnthropicAdapter
-from .deepseek_adapter import DeepSeekAdapter
 from .mistral_adapter import MistralAdapter
 from .cohere_adapter import CohereAdapter
 from .google_adapter import GoogleAdapter
@@ -54,8 +53,6 @@ class ModelAdapterFactory:
             return OpenAIAdapter(client=client, default_model=model, **kwargs)
         elif provider == "anthropic":
             return AnthropicAdapter(client=client, default_model=model, **kwargs)
-        elif provider == "deepseek":
-            return DeepSeekAdapter(client=client, default_model=model, **kwargs)
         elif provider == "mistral":
             return MistralAdapter(client=client, default_model=model, **kwargs)
         elif provider == "cohere":

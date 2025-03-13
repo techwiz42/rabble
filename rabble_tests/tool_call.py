@@ -10,7 +10,6 @@ Providers tested:
 - Google
 - Mistral
 - Cohere
-- DeepSeek
 """
 
 import os
@@ -95,8 +94,7 @@ def run_tool_chain_test():
         ("Anthropic", "anthropic", os.getenv("ANTHROPIC_DEFAULT_MODEL", "claude-3-7-sonnet-20250219")),
         ("Google", "google", os.getenv("GOOGLE_DEFAULT_MODEL", "gemini-1.5-flash")),
         ("Mistral", "mistral", os.getenv("MISTRAL_DEFAULT_MODEL", "mistral-small-latest")),
-        ("Cohere", "cohere", os.getenv("COHERE_DEFAULT_MODEL", "command-light")),
-        ("DeepSeek", "deepseek", os.getenv("DEEPSEEK_DEFAULT_MODEL", "deepseek-chat"))
+        ("Cohere", "cohere", os.getenv("COHERE_DEFAULT_MODEL", "command-light"))
     ]
     
     # Create agents using the same configuration pattern for all providers
